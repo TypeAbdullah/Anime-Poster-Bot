@@ -22,7 +22,6 @@ TEMPLATE_PATH = "template.png"
 BOLD_FONT_PATH = "BebasNeue-Regular.ttf"
 BOLD_FONT_URL = "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf"
 
-# Conversation state
 LANGUAGE_INPUT = 1
 
 # ======================
@@ -83,25 +82,22 @@ def generate_thumbnail(anime_data, language_text: str = ""):
     if os.path.exists(TEMPLATE_PATH):
         base = Image.open(TEMPLATE_PATH).convert("RGBA")
     else:
-        # Fallback: pure white background
         base = Image.new("RGBA", (1280, 720), (255, 255, 255, 255))
 
-    # Fetch and paste poster (right side)
+    # Get poster URL
     poster_url = anime_data['coverImage']['extraLarge']
-    poster = Image.open(BytesIO(requests.get(poster_url).content)).convert("RGBA")
-    poster = poster.resize((500, 720), Image.Resampling.LANCZOS)
-    base.paste(poster, (780, 0), poster)
 
-    # Get dominant color for text box
+    # Extract dominant color for info box background
     dominant = get_dominant_color(poster_url)
     r, g, b = dominant
     bg_color = (min(255, r + 40), min(255, g + 40), min(255, b + 40))
     luminance = 0.299 * r + 0.587 * g + 0.114 * b
     text_color = (255, 255, 255) if luminance < 160 else (20, 20, 40)
 
-    # Draw semi-transparent background behind text
+    # Create semi-transparent overlay for info box (left side only)
     overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
     draw_overlay = ImageDraw.Draw(overlay)
+    # Info box area: from top to bottom, width ~750px
     draw_overlay.rectangle([(0, 0), (750, 720)], fill=bg_color + (220,))
     base = Image.alpha_composite(base, overlay)
 
@@ -112,7 +108,6 @@ def generate_thumbnail(anime_data, language_text: str = ""):
         info_font = ImageFont.load_default().font_variant(size=28)
         small_font = ImageFont.load_default().font_variant(size=24)
     except:
-        # Fallback if font fails
         title_font = ImageFont.load_default()
         info_font = ImageFont.load_default()
         small_font = ImageFont.load_default()
@@ -123,17 +118,25 @@ def generate_thumbnail(anime_data, language_text: str = ""):
     title = anime_data['title']['english'] or anime_data['title']['native'] or "Unknown Title"
     draw.text((60, 80), title, fill=text_color, font=title_font)
 
-    # Studio
-    studios = ", ".join([s['name'] for s in anime_data['studios']['nodes']]) if anime_data['studios']['nodes'] else "Unknown Studio"
-    draw.text((60, 190), f"Studio: {studios}", fill=text_color, font=info_font)
+    # Studio (only first)
+    studios = anime_data['studios']['nodes'] if anime_data['studios']['nodes'] else []
+    studio_name = studios[0]['name'] if studios else "Unknown Studio"
+    draw.text((60, 180), f"Studio: {studio_name}", fill=text_color, font=info_font)
 
     # Genres
     genres = ", ".join(anime_data['genres'][:4]) if anime_data['genres'] else "N/A"
-    draw.text((60, 230), f"Genres: {genres}", fill=text_color, font=small_font)
+    draw.text((60, 220), f"Genres: {genres}", fill=text_color, font=small_font)
 
     # Language
     if language_text.strip():
-        draw.text((60, 270), f"Language: {language_text}", fill=text_color, font=small_font)
+        draw.text((60, 260), f"Language: {language_text}", fill=text_color, font=small_font)
+
+    # Small Poster (below text, resized to 300x400)
+    poster_img = Image.open(BytesIO(requests.get(poster_url).content)).convert("RGBA")
+    poster_img = poster_img.resize((300, 400), Image.Resampling.LANCZOS)
+    poster_x = 60  # Left-aligned under text
+    poster_y = 320  # Below language line
+    base.paste(poster_img, (poster_x, poster_y), poster_img)
 
     # Final output: RGB (Telegram doesn't support RGBA PNG well)
     final = Image.alpha_composite(Image.new("RGBA", base.size, (255, 255, 255)), base).convert("RGB")

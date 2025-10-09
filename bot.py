@@ -36,6 +36,8 @@ class AnimePosterGenerator:
             genres
             format
             episodes
+            season
+            seasonYear
             averageScore
             studios {
               nodes {
@@ -61,54 +63,62 @@ class AnimePosterGenerator:
         response = requests.get(url)
         return Image.open(BytesIO(response.content))
     
-    def create_gradient_background(self):
-        """Create vibrant gradient background"""
+    def create_aesthetic_background(self):
+        """Create aesthetic gradient background with patterns"""
         img = Image.new('RGB', (self.width, self.height))
         draw = ImageDraw.Draw(img)
         
-        # Create deep blue to purple gradient
+        # Create smooth purple to deep blue gradient
         for y in range(self.height):
-            r = int(20 + (80 * y / self.height))
-            g = int(10 + (40 * y / self.height))
-            b = int(80 + (120 * y / self.height))
+            # Smooth transition from purple to deep blue
+            r = int(60 - (30 * y / self.height))
+            g = int(40 - (20 * y / self.height))
+            b = int(120 + (60 * y / self.height))
             draw.line([(0, y), (self.width, y)], fill=(r, g, b))
         
         return img
     
     def add_fireworks_effect(self, img):
-        """Add colorful burst effects"""
+        """Add colorful firework bursts"""
         overlay = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(overlay)
         
-        # Create multiple colorful bursts
         import random
-        colors = [
-            (255, 100, 200, 150),  # Pink
-            (100, 200, 255, 150),  # Cyan
-            (255, 200, 100, 150),  # Orange
-            (200, 100, 255, 150),  # Purple
-            (100, 255, 200, 150),  # Mint
+        
+        # Define firework positions and colors
+        fireworks = [
+            {'x': 650, 'y': 80, 'color': (255, 180, 100, 180), 'size': 80},
+            {'x': 850, 'y': 120, 'color': (255, 100, 200, 180), 'size': 70},
+            {'x': 750, 'y': 200, 'color': (100, 200, 255, 180), 'size': 60},
+            {'x': 650, 'y': 280, 'color': (200, 100, 255, 180), 'size': 65},
+            {'x': 550, 'y': 150, 'color': (100, 255, 200, 180), 'size': 55},
         ]
         
-        for _ in range(15):
-            x = random.randint(self.width//2, self.width - 100)
-            y = random.randint(50, self.height//2)
-            color = random.choice(colors)
-            size = random.randint(40, 100)
+        for fw in fireworks:
+            x, y = fw['x'], fw['y']
+            color = fw['color']
+            size = fw['size']
             
-            # Draw starburst lines
-            for angle in range(0, 360, 15):
+            # Draw starburst pattern
+            for angle in range(0, 360, 12):
                 import math
                 end_x = x + int(size * math.cos(math.radians(angle)))
                 end_y = y + int(size * math.sin(math.radians(angle)))
-                draw.line([(x, y), (end_x, end_y)], fill=color, width=2)
+                
+                # Thicker lines
+                draw.line([(x, y), (end_x, end_y)], fill=color, width=3)
+                
+                # Add small circles at the end
+                circle_size = 4
+                draw.ellipse([end_x-circle_size, end_y-circle_size, 
+                            end_x+circle_size, end_y+circle_size], fill=color)
         
         return Image.alpha_composite(img.convert('RGBA'), overlay)
     
     def generate_poster(self, anime_data):
         """Generate anime poster"""
         # Create base
-        base = self.create_gradient_background()
+        base = self.create_aesthetic_background()
         
         # Add effects
         poster = self.add_fireworks_effect(base)
@@ -117,14 +127,14 @@ class AnimePosterGenerator:
         # Add anime cover on the right
         if anime_data.get('coverImage', {}).get('extraLarge'):
             cover = self.download_image(anime_data['coverImage']['extraLarge'])
-            cover = cover.resize((400, 566), Image.Resampling.LANCZOS)
+            # Larger cover
+            cover = cover.resize((450, 636), Image.Resampling.LANCZOS)
             
-            # Add glow effect
-            mask = Image.new('L', cover.size, 0)
-            mask_draw = ImageDraw.Draw(mask)
-            mask_draw.rectangle([0, 0, cover.width, cover.height], fill=255)
+            # Position cover on the right
+            cover_x = self.width - 480
+            cover_y = (self.height - 636) // 2
             
-            poster.paste(cover, (self.width - 450, (self.height - 566)//2), cover if cover.mode == 'RGBA' else None)
+            poster.paste(cover, (cover_x, cover_y), cover if cover.mode == 'RGBA' else None)
         
         # Add text overlay
         draw = ImageDraw.Draw(poster)
@@ -132,53 +142,77 @@ class AnimePosterGenerator:
         # Get title
         title = anime_data['title'].get('english') or anime_data['title']['romaji']
         
-        # Try to load fonts, fallback to default
+        # Try to load fonts with larger sizes
         try:
-            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 70)
-            info_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 30)
-            small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 24)
+            # Much larger fonts
+            title_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 90)
+            info_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 38)
+            small_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 32)
+            logo_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 42)
         except:
             title_font = ImageFont.load_default()
             info_font = ImageFont.load_default()
             small_font = ImageFont.load_default()
+            logo_font = ImageFont.load_default()
         
-        # Add Mayhem logo/text at top
-        draw.text((30, 20), "ANIME MAYHEM", font=info_font, fill=(255, 255, 255))
+        # Add ANIME MAYHEM logo at top
+        draw.text((40, 30), "ANIME MAYHEM", font=logo_font, fill=(255, 255, 255), 
+                 stroke_width=2, stroke_fill=(0, 0, 0))
         
-        # Add title (wrapped)
-        y_pos = 150
-        wrapped_title = textwrap.wrap(title, width=25)
+        # Add title (wrapped) - much larger
+        y_pos = 160
+        wrapped_title = textwrap.wrap(title, width=18)
         for line in wrapped_title[:2]:  # Max 2 lines
-            draw.text((50, y_pos), line, font=title_font, fill=(255, 255, 255), stroke_width=2, stroke_fill=(0, 0, 0))
-            y_pos += 80
+            draw.text((50, y_pos), line, font=title_font, fill=(255, 255, 255), 
+                     stroke_width=3, stroke_fill=(0, 0, 0))
+            y_pos += 100
         
-        # Add studio info
-        studio = anime_data.get('studios', {}).get('nodes', [{}])[0].get('name', 'Studio Lings')
-        draw.text((50, y_pos + 30), f"🎬 {studio}", font=small_font, fill=(255, 255, 255))
+        # Add studio info with larger font
+        studio = anime_data.get('studios', {}).get('nodes', [{}])[0].get('name', 'Unknown Studio')
+        draw.text((50, y_pos + 40), f"🎬 {studio}", font=info_font, fill=(255, 255, 255))
         
-        # Add genres
-        genres = ', '.join(anime_data.get('genres', [])[:4])
-        draw.text((50, y_pos + 70), f"🎭 {genres}", font=small_font, fill=(255, 255, 255))
+        # Add genres with larger font
+        genres = ', '.join(anime_data.get('genres', [])[:3])
+        draw.text((50, y_pos + 95), f"🎭 {genres}", font=info_font, fill=(255, 255, 255))
         
-        # Add language/format info
-        format_text = anime_data.get('format', 'TV')
+        # Add season and episodes info
+        season = anime_data.get('season', '').capitalize() if anime_data.get('season') else 'Unknown'
+        year = anime_data.get('seasonYear', '')
         episodes = anime_data.get('episodes', '?')
-        draw.text((50, y_pos + 110), f"🎙️ Japanese [Eng Sub] • {episodes} Episodes", font=small_font, fill=(255, 255, 255))
+        
+        season_text = f"{season} {year}" if year else season
+        episode_text = f"{episodes} Episodes" if episodes != '?' else "Episodes TBA"
+        
+        draw.text((50, y_pos + 150), f"📅 {season_text} • {episode_text}", 
+                 font=info_font, fill=(255, 255, 255))
         
         # Add score if available
         if anime_data.get('averageScore'):
-            draw.text((50, y_pos + 150), f"⭐ Score: {anime_data['averageScore']}/100", font=small_font, fill=(255, 255, 255))
+            draw.text((50, y_pos + 205), f"⭐ Score: {anime_data['averageScore']}/100", 
+                     font=info_font, fill=(255, 255, 255))
         
-        # Add sidebar text
-        sidebar_font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 35) if os.path.exists("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf") else title_font
+        # Add vertical "ANIME MAYHEM" text on the right side
+        # Create text image for rotation
+        sidebar_text = "ANIME MAYHEM"
         
-        # Rotate text for sidebar
-        sidebar = Image.new('RGBA', (500, 100), (0, 0, 0, 0))
-        sidebar_draw = ImageDraw.Draw(sidebar)
-        sidebar_draw.text((10, 10), "ANIME MAYHEM", font=sidebar_font, fill=(255, 255, 255))
-        sidebar = sidebar.rotate(90, expand=True)
+        # Calculate text size for proper positioning
+        bbox = draw.textbbox((0, 0), sidebar_text, font=logo_font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
         
-        poster.paste(sidebar, (self.width - 70, self.height//2 - 100), sidebar)
+        # Create temporary image for text
+        text_img = Image.new('RGBA', (text_width + 20, text_height + 20), (0, 0, 0, 0))
+        text_draw = ImageDraw.Draw(text_img)
+        text_draw.text((10, 10), sidebar_text, font=logo_font, fill=(255, 255, 255), 
+                      stroke_width=2, stroke_fill=(0, 0, 0))
+        
+        # Rotate 90 degrees
+        text_img = text_img.rotate(90, expand=True)
+        
+        # Paste on main image
+        text_x = self.width - 60
+        text_y = self.height // 2 - text_img.height // 2
+        poster.paste(text_img, (text_x, text_y), text_img)
         
         return poster
 
@@ -193,7 +227,7 @@ I can create stunning anime posters for you!
 📝 How to use:
 Just send me an anime name and I'll generate a beautiful poster for it.
 
-Example: "Demon Slayer"
+Example: "One Piece"
 
 Let's create some amazing posters! 🎨
     """
@@ -254,10 +288,10 @@ Usage:
 Simply send any anime name to generate a poster!
 
 Examples:
+• One Piece
 • Demon Slayer
 • Attack on Titan
 • Jujutsu Kaisen
-• One Piece
 
 The bot will search AniList and create a custom poster for you! 🎨
     """

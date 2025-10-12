@@ -8,7 +8,7 @@ from io import BytesIO
 import textwrap
 
 # Bot Token - Replace with your token from @BotFather
-BOT_TOKEN = "6818501149:AAFG8g-HGVOfgD_N38NF3xWbb4v4PcyQyKY"
+BOT_TOKEN = "6818501149:AAFG8g"
 
 # AniList API endpoint
 ANILIST_API = "https://graphql.anilist.co"
